@@ -12,3 +12,8 @@ GRANT SELECT,EVENT,INSERT,UPDATE,REFERENCES,DELETE,CREATE,DROP,ALTER,INDEX,TRIGG
 
 GRANT SELECT,LOCK TABLES,SHOW VIEW ON `test\_dailysearch\_geekbang\_org`.* TO 'geekbang'@'%';
 ```
+
+
+```
+DATE_FORMAT(FROM_UNIXTIME(chattime),’%Y-%m-%d’)
+```

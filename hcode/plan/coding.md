@@ -8,9 +8,9 @@
 - 数据库
 
 ## 实践
-- 工具 Git/Vscode
-- 语言 代码精进/Golang
 - 架构 Nginx/并发/微服务/k8s/持续交付
+- 语言 代码精进/Golang
+- 效率 Git/Vscode/DevOps
 
 ## 领域
 - 大数据处理/分析
