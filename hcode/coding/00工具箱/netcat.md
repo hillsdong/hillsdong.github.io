@@ -1,0 +1,2 @@
+
+https://medium.com/@programthink/%E6%89%AB%E7%9B%B2-netcat-%E7%BD%91%E7%8C%AB-%E7%9A%84-n-%E7%A7%8D%E7%94%A8%E6%B3%95-%E4%BB%8E-%E7%BD%91%E7%BB%9C%E8%AF%8A%E6%96%AD-%E5%88%B0-%E7%B3%BB%E7%BB%9F%E5%85%A5%E4%BE%B5-3c12b3ce0fdf

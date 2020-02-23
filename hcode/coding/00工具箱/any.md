@@ -1,3 +1,8 @@
+## split
+```
+split -l 2482 ../BLM/BLM.txt -d -a 4 BLM_
+```
+
 ## rpm解压
 ```
 rpm2cpio xxx.rpm | cpio -div
