@@ -271,7 +271,7 @@
 - 自定义请求方法 Purge 用于请求里代理缓存
 
 ## 安全23-29 SSL/TLS / 对称/非对称加密 / TLS1.2连接 / TLS1.3特征 / HTTPS优化
-学习记录：200216/200217/200218
+学习记录：200216/200217/200218/200224/200225
 ### SSL/TLS
 - 安全：机密性/完整性/身份认证/不可否认
 - 机密性：Secrecy/Confidentiality 不能让不相关人看到不该看的东西
@@ -344,23 +344,145 @@
 
 ### TLS1.2
 - TLS协议：Record Protocol / Alert Protocol / Handshake Protocol / Change Cipher Spec Protocol
-- 
+- 普遍为单向认证，双向认证需要 U盾 等设备
+- 不压缩，防止 CRIME 攻击
+
+### ECDHE 握手流程
+- c->s Client Hello | Version/Random/Cipher Suites
+- ACK
+- s->c Server Hello | Version/Random/Cipher Suite
+- s->c Server Certificate 
+- s->c Server Key Exchange | Service Params(Pubkey/Signature...)
+- s->c Server Hello Done
+- ACK
+- c 验证证书/签名
+- c->s Clinet Key Exchange | Client Params(Pubkey/Signature...)
+- c/s 计算pre-master/计算master secret
+- c->s Change Chipher Spec
+- c->s Finished ｜ 握手数据摘要
+- ACK
+- c->s GET / HTTP/1.1
+- ACK
+- s->c Change Chipher Spec
+- s->c Finished ｜ 握手数据摘要
+- ACK
+- s->c HTTP/1.1 200 OK
+- ACK
+
+### RSA 握手
+- Pre Master 不在需要使用算法生成，而是客户端生产，使用服务端公钥加密，传给服务端
+- Change Chipher Spec 完成后，才进行 HTTP 请求
+- 不具有向前安全
 
 ### TLS1.3
+- 目标：兼容/安全/性能
+- 兼容：扩展协议 Extension Protocol，握手协议中，version 不变，增加supported_versions
+- 安全：随机函数升级 / 禁止压缩 / 废除不安全对称加密算法/分组模式/摘要算法/密钥交换算法/曲线
+- 只保留 AES/ChaCha20 对称加密算法 / GCM/CCM/Poly1305 分组模式 / SHA256/SHA384 摘要算法
+- 只保留 ECDHE/DHE 密钥交换算法 / P-256/x25519 椭圆曲线
+- 只有5个套件：TLS_AES_128_GCM_SHA256 {0x13,0x01} / TLS_AES_256_GCM_SHA384 {0x13,0x02} 
+- 只有5个套件：TLS_CHACHA20_POLY1305_SHA256 {0x13,0x03}
+- 只有5个套件：TLS_AES_128_CCM_SHA256 {0x13,0x04} / TLS_AES_128_CCM_8_SHA256 {0x13,0x05}
+- 性能：不用协商算法，握手时间减少到 1-RTT / 使用扩展实现 0-RTT
+- 贴士：棱镜计划 使用了 非向前安全 漏洞
 
 ### HTTPS优化
+- 慢：非对称加密握手/对称加密报文传输
+- 加密握手：产生临时公私钥对/验证证书/非对称加解密/处理pre-master
+- 硬件优化：更快CPU/内建AES优化的CPU/SSL加速卡/SSL加速服务器
+- 软件优化：Linux/Nginx/OpenSSL软件升级
+- 协议优化：升级到TLS1.3/选择高性能曲线/选择AES_128_GCM
+- 证书优化：选择椭圆曲线（ECDSA）证书而不是RSA证书/OCSP装订
+- 会话复用：通过 Session ID 跳过证书验证和密钥交换
+- 会话票证：Session Ticket 客户端存储加密会话信息
+- 预共享密钥：Pre-shared Key，PSK，发送 Ticket 同时带上数据
+- 重放 Replay 攻击/中间人 Man-in-the-middle 攻击/社会工程学 social engineering
 
 ### 迁移到HTTPS
+- 同时申请RSA/ECDSA两种证书 / RSA证书私钥至少2048位SHA256/384摘要算法
+- Nginx 配置：listen 443 ssl/ssl_protocols
+- ssl_certificate/ssl_certificate_key
+- ssl_session_timeout/ssl_session_tickets/ssl_session_tickets_key
+- ssl_perfer_server_ciphers/ssl_ciphers
+- 服务器名称指示：TLS 的 SNI（Server Name Indication）扩展
+- 重定向跳转 rewrite/HSTS（HTTP Strict Transport Security）
+- 贴士：SNI 使用明文，是 TLS 盔甲上最后一个缝隙
 
 ## 飞翔30-33 HTTP/2 / HTTP/3
-学习记录：200220，共小时
+学习记录：200220/200226/200227
 
 ### HTTP/2
-- 不再使用小版本号
-- 目标是改进性能
-- 向前兼容HTTTP/1，语义不变，语法天翻地覆
+- 目标：改进性能
+- 不再使用小版本号：不是 HTTP/2.0，避免混淆
+- 兼容HTTTP/1：语义不变
+- 头部压缩：采用 HPACK 算法，运用字典/哈夫曼编码压缩头部
+- 二进制格式：把“Header+Body”打散为二进制“帧”（Frame），HEADERS帧+DATA帧
+- 虚拟的“流”（Stream）：二进制的双向传输序列
+- 多路复用：一个 TCP 连接上用 流 发送多个乱序的 帧，解决 队头堵塞
+- 服务器推送：服务器可以新建 流 主动向客户端发消息
+- 支持非HTTPS：分为 h2 和 h2c（clear text） 版本
+- 强化安全：要求 TLS1.2 以上，支持 向前安全 和 SNI
+- 协议栈：MAC/IP/TCP/TLS1.2+/HPack+Stream/HTTP
+- 课后1: h2c 版本在内部网络环境使用，方便调试
+- 课后2: 流 是在 HTTP 和 TCP 间的一个中间层协议，其传送的帧是并不是真实数据单元
+- 贴士：HTTP/2 要求实现 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 
+### HTTP/2 协议细节
+- 连接前言：PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n
+- 伪头字段：起始行的请求方法/URI/状态码 转换成 头字段形式，以 : 开始
+- 静态表：2 :methoed GET / 3 :method POST / 4 :path / ...
+- 动态表：哈夫曼编码
+- Frame Header：帧长度24bit + 帧类型8bit + 标志位8bit + 流标识符31bit
+- Frame Payload：数据
+- 帧长度：默认上限是2^14，即16K，最大16M
+- 帧类型：HEADERS/DATA 是数据帧类型，SETTINGS/PING/PRIORITY 等是控制帧类型
+- 帧标志位：END_HEADERS 头数据结束 / END_STREAM 单方向数据发送结束
 
+### 流与多路复用
+- 一个 TCP 连接上可以有多个流
+- 客户端和服务端都可以创建流，互不干扰
+- 流是双向的，一个流里有 请求 和 响应
+- 不同流 ID 间的帧之间乱序，相同流 ID 间的帧有序
+- 流可设置优先级
+- 流 ID 不能重用，只能顺序递增，客户端发起的 ID 是奇数，服务端是偶数
+- RST_STREAM 帧可随时终止流，GOAWAY 帧关闭连接
+- 0 号流用于发送控制帧，用于流量控制，不能关闭
+- 默认是长连接，不需要 Connection 头
+- 状态转换 idle->open->halfclosed->closed
+- 课后：HTTP/2 既可无状态，也可有状态
+- 课后：帧的最优大小取决于带宽状态
+- 课后：HTTP/2通过在一个连接上创建多个流实现多路复用，解决对头堵塞
+- 贴士：HTTP/2要求头字段全部小写
+
+### HTTP/3
+- TCP 丢包重传机制导致 TCP 层面的对头堵塞
+- 基于 QUIC 协议，而非 TCP
+- 协议栈：MAC/IP/UDP/TLS1.3+ + QUIC/QPack+Stream/HTTP
+- QUIC 指 iQUIC，是传输层协议
+- 双向流实现请求应答，单向流实现控制和推送，类似 HTTP/2 0 号流
+- 帧头只有类型和长度两个字段，类型为控制帧和数据帧
+- QPACK 解决了 HPACK 的对头堵塞问题
+- 不需要绑定端口，利用 HTTP/2 扩展帧，发送 host:port 到浏览器
+- 课后1：QUIC 不基于 IP 协议 是因为没有设备认识它
+- 课后2：HTTP/3 端口不固定、内容天然加密、连接迁移等特性，让互联网回归自由
+- 贴士：HTTP/3 帧长可达 2^62，不需要 END_HEADERS 和 CONTINUATION 帧
+
+### TUIC 特点
+- 基于 UDP，无连接，天生快
+- 实现可靠传输，引入 流 和 多路复用
+- 全面加密，内化 TLS1.3
+- 传输单位是 包 和 帧，包 面向连接，帧 面向流
+- 连接不依赖 IP地址+端口，网络变化，连接不断
+- 流 ID 低2位标记流方向，0 表示双向，1表示单向
+- 流 ID 奇偶性与 HTTP/2 相反，0 为客户端，1 为服务端
+
+![HTTP协议栈](http://cdn1.klib.cn/u/NzKCZx.jpg)
+
+### HTTP/2 迁移
+- 优点：兼容HTTP/1，强化安全，节约带宽，充分利用带宽
+- 缺点：TCP 对头堵塞/重连慢启动/只开一个连接
+- 配置：listen 443 ssl http2;
+- 服务发现：TLS扩展，ALPN Application Layer Protocal Negotiation
 
 ## 探索34-38 Nginx/OpenResty/WAF/CDN/WebSocket
 学习记录：200219，共2小时
@@ -435,7 +557,6 @@
 - 节流：减少数据量，如文本压缩/图片压缩/切图/少用Cookie/收缩域名/减少重定向
 - 缓存：服务器缓存 / CDN / ETag/Last-modified/Cache-Control/Expires等头
 - HTTP/2：收缩域名/资源力度尽量小
-
 
 ## 答疑42-42 实验环境 / DHE/ECDHE算法
 - DH Diffie-Hellman 迪菲-赫尔曼算法，非对称加密算法，基础是离散对数

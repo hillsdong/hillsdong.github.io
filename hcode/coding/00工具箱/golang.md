@@ -12,3 +12,7 @@ $ GOOS=windows GOARCH=amd64 go build
 $ GOOS=windows GOARCH=386 go build
 ### 编译到 Mac OS X 64bit
 $ GOOS=darwin GOARCH=amd64 go build
+
+### 内存分析
+go test -benchmem -run=^$ time.geekbang.org/frame/utils -bench ^BenchmarkBatchRun$ -v -memprofile memprofile.out
+go tool pprof memprofile.out

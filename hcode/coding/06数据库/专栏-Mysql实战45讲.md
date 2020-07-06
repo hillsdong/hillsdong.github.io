@@ -2,24 +2,69 @@
 - 执行流程：客户端->连接器->分析器->优化器->执行器->存储引擎
 - 连接器：show processlist 查看连接，sleep状态为空闲链接，wait_timeout控制连接超时，尽量用长连接，但长连接占内存，5.7后执行 mysql_reset_connetcion 释放
 - 查询缓存: 建议配置 query_cache_type=DEMAND，即默认不使用，通过 SQL_CACHE 关键字使用 8.0后不支持
-- 分析器：词法分析/语法分析/语义分析 决定使用哪个索引/多表关联时表连接顺序等，表列等检查也在此阶段
-- 执行器；先进行权限校验，慢查询日志中可看到 rows_examined，和引擎真正扫描行数不一定相同
-- 存储引擎：Innodb[5.5后默认]/MyISAM/Memory
+- 分析器：词法分析/语法分析/语义分析，表列不存在等检查也在此阶段
+- 优化器：决定使用哪个索引/多表关联时表连接顺序等
+- 执行器；先进行权限校验，慢查询日志中可看到扫描行数 rows_examined，和引擎真正扫描行数不一定相同
+- 存储引擎：Innodb(5.5.5后默认)/MyISAM/Memory
 - 作业：列是否存在，是在分析器阶段判断的
 
 ## 02 日志系统
-- 更新语句流程：取某行->更新行数据->写入新行->更新到内存->写入redolog，状态为prepare -> 写入binlog -> 提交事务 -> 更新redolog 状态为commit
-- Innodb引擎：WAL（Write-Ahead Logging）技术，redolog 固定文件数固定大小，循环写，物理日志，如4个1G文件， write pos是当前位置，checkpoint是当前要擦除的位置
+- WAL技术（Innodb引擎）：Write-Ahead Logging，先写日志再写磁盘，类似先写粉板再写账本
+- redolog： 固定文件数固定大小，循环写，物理日志，如4个1G文件， write pos 是当前位置，checkpoint 是当前要擦除的位置
 - crash-safe，即通过 redolog 保证即使异常重启，记录也不会丢
 - Server层：binlog，追加写，逻辑日志
-- 两阶段提交：redolog分为prepare状态和commit状态，如何不依赖binlog保证一致性？
+- 更新语句流程：取某行->更新行数据->写入新行->更新到内存->写入 redolog，状态为 prepare -> 写入 binlog -> 提交事务 -> 更新 redolog 状态为 commit
+- 两阶段提交：redolog 分为 prepare 状态和 commit 状态，如何不依赖 binlog 保证一致性？
 - 作业：根据业务容忍恢复时间来决定备份周期
 
-## 03 事务隔离
+## 03/08 事务隔离
 - 事务：ACID（Atomicity原子性/Consistency一致性/Isolation隔离性/Durability持久性）
 - 问题：脏读（dirty read）/不可重复读（non-repeatable read）/幻读（phantom read）
 - 隔离级别：读未提交（read uncommitted）/读提交（read committed）/可重复读（repeatable read）/串行化（serializable）
+- 多版本并发控制（MVCC）: 同一条记录在系统中存在多个版本，不同时刻的事务对应不同的视图（read-view），通过回滚得到不同版本
+- 长事务危害：回滚段占用内存，占用锁资源
+- 事务启动方式：set autocommit=0时，所有事务均需手动commit；=1时，默认自动commit，使用begin显式启动事务时需手动commit
+- 作业：如何避免长事务？
+- 开发端：set autocommit=1；避免不必要的只读事务；set max_execution_time=xxx
+- 数据库端：监控 information_schema.Innodb_trx；pt-kill 工具；general_log 分析；innodb_undo_tablespaces=2
+- 当前读： 事务中更新数据都是先读后写，不遵循一致性视图，select 加锁也是当前读
+- 表结构没有行数据，没有row trx_id，只能遵循当前读，不支持可重复读
 
+
+## 04/05 索引
+- 哈希表：哈希算法+数组+链表，等值查询性能高，范围查询性能低
+- 有序数组：等值查询和范围查询性能都很高，更新成本高
+- 二叉搜索树：搜索效率最高，树高较高导致磁盘请求次数多
+- N叉数；InnoDB整数字段索引的 N 差不多为1200，应用广泛
+- 跳表/LSM树
+- 
+- InnoDB 表使用 B+ 树索引模型，分为主键索引/非主键索引
+- 主键索引也叫聚簇索引 clustered index，叶子节点存放数据页，包括多个整行数据
+- 非主键索引也叫二级索引 secondary index，叶子节点存放主键
+- 自增主键优点：新增数据性能好，直接追加即可；二级索引占用空间小
+- 自增主键索引建议设置为 bigint unsigned
+- 作业：先重建非主键索引再重建主键索引不合理，非主键索引包含主键索引
+- 重建索引可减少页空洞，减少空间占用
+- 
+- 覆盖索引：索引覆盖了查询所需字段，可以避免回表，减少树的搜索次数，提升性能
+- 前缀索引：联合索引的最左N个字段，或字符串索引的最左N个字符，都可以应用索引
+- 索引下推：5.6之后，索引遍历过程中，对索引中包含的字段先做判断，减少回表次数
+- 作业：非主键索引会把主键索引加在后面，当 ab 为主键时, 索引 c / ca / cab 是一样的
+
+## 06/07 锁
+- 设计初衷：处理并发问题，合理控制资源访问
+- 分为：全局锁/表级锁/行锁
+- 全局锁：使用 FTWRL 语句添加，堵塞 数据更新语句/数据定义语句/更新类事务的提交语句
+- 全库逻辑备份：最早使用全局锁，现可使用 mysqldump --single-transaction 在可重复读隔离级别下启动事务
+- 不建议使用 set global readonly=true 做备份，会用来做备库判断，且异常不会自动恢复
+- 表级别锁：分为表锁（lock tables T read/write）/MDL 元数据锁
+- 对表做增删改查操作的时候，加 MDL 读锁，对表做结构变更操作的时候，加 MDL 写锁
+- MDL 读锁间不冲突，读写锁间/写锁间冲突
+- MDL 写锁被堵塞后，以后的 MDL 读锁都会被堵塞，因此给小表加字段也有可能堵塞库，可设置等待时间解决
+- 行锁： 两个更新事务不能同时更新一行
+- 两阶段锁： 在需要的时候加上，但等到事务结束的时候才释放
+- 减少锁等待： 把事务中，将最可能造成锁冲突的锁往后放
+- 解决死锁： 配置锁等待超时/配置死锁检测/中间件同行更新等待/将单行拆为多行
 
 ## 18 函数计算用不上索引
 - 显式函数

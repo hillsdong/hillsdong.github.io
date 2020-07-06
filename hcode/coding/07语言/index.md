@@ -12,6 +12,7 @@
 - Go101 https://github.com/go101/go101
 - Go https://dave.cheney.net/high-performance-go-workshop/gopherchina-2019.html
 - Learn Go with tests https://studygolang.gitbook.io/learn-go-with-tests/
+- Go学习笔记 https://draveness.me/golang/
 
 ## 专栏
 - Go语言核心36讲 https://time.geekbang.org/column/intro/112

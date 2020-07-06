@@ -55,3 +55,5 @@ $6	IP of your local network gateway	192.168.1.1
 $ networksetup -listallnetworkservices
 $ networksetup -setadditionalroutes 'My Office' 172.16.0.0 255.255.240.0 192.168.0.1 192.168.2.0 255.255.255.0 192.168.0.1
 ```
+
+

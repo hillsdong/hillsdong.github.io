@@ -1,5 +1,30 @@
 # k8s专栏学习
 
+## 原理
+- Docker 中的进程就是宿主机中的进程
+- DOcker 之所以不能只启动一个容器是因为我们能启动的是一个进程，它需要一个进程
+- Namespace 资源隔离
+- Cgroups，Linux Control Group 资源限制
+- lxcfs /proc/* 隔离，docker 没做
+- Mount Namespace，来源自 chroot，Change Root
+- Rootfs 根文件系统，不包含内核，内核在开机启动时加载，一致性来源
+- UnionFS，Union File System，将文件系统分层后联合挂载
+- 容器运行时：Namspace/Cgroup，容器镜像：Rootfs
+
+## 
+- k8s 来源自 Borg
+- 运行在大规模集群中的各种任务之间，实际上存在着各种各样的关系。这些关系的处理，才是作业编排和管理系统最困难的地方
+- 编排对象： Pod/Job/CronJob
+- 服务对象： Service/Secret/Horizontal Pod Autoscaler
+- k8s： 具有普遍意义的容器“编排”工具
+- 声明式API： yaml配置文件
+
+
+
+
+
+
+
 ## Linux容器
 
 一组联合挂载在 /var/lib/docker/aufs/mnt 上的 **rootfs**，这一部分我们称为“容器镜像”（Container Image），是容器的**静态视图**；
